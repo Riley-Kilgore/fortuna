@@ -61,7 +61,7 @@ const mine = new Command()
             genesisFile,
           );
 
-        const provider = blockfrost ? new blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
+        const provider = blockfrost ? new Blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
         const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
 
         lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
@@ -244,6 +244,11 @@ const mine = new Command()
           const signed = await txMine.sign().complete();
 
           await signed.submit();
+          if (!blockfrost && blockfrostApiKey && blockfrostUrl) {
+            const blockfrost = new Blockfrost(blockfrostUrl, blockfrostApiKey);
+            const blockfrostTx = await blockfrost.submitTx(signed.toString());
+            console.log(`Blockfrost TX Hash: ${blockfrostTx.tx_hash}`);
+          }
 
           console.log(`TX HASH: ${signed.toHash()}`);
           console.log("Waiting for confirmation...");
