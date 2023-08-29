@@ -40,8 +40,8 @@ const delay = (ms: number | undefined) =>
 
 const mine = new Command()
   .description("Start the miner")
-  .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
-  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("KUPO_URL=<value:string>", "Kupo URL", { required: false })
+  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: false })
   .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
   .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
@@ -49,6 +49,9 @@ const mine = new Command()
   .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
     if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
       throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
+    if (!blockfrost && (!ogmiosUrl || !kupoUrl)) {
+      throw new Error("Ogmios and Kupo URL are required when flag is disabled.");
     }
     while (true) {
       try {
@@ -265,8 +268,8 @@ const mine = new Command()
 
 const genesis = new Command()
   .description("Create block 0")
-  .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
-  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("KUPO_URL=<value:string>", "Kupo URL", { required: false })
+  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: false })
   .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
   .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
@@ -274,6 +277,9 @@ const genesis = new Command()
   .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
     if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
       throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
+    if (!blockfrost && (!ogmiosUrl || !kupoUrl)) {
+      throw new Error("Ogmios and Kupo URL are required when flag is disabled.");
     }
     const unAppliedValidator = readValidator();
 
@@ -380,8 +386,8 @@ const init = new Command().description("Initialize the miner").action(() => {
 
 const address = new Command()
   .description("Check address balance")
-  .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
-  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("KUPO_URL=<value:string>", "Kupo URL", { required: false })
+  .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: false })
   .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
   .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
@@ -389,6 +395,9 @@ const address = new Command()
   .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
     if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
       throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
+    if (!blockfrost && (!ogmiosUrl || !kupoUrl)) {
+      throw new Error("Ogmios and Kupo URL are required when flag is disabled.");
     }
     const provider = blockfrost ? new Blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
     const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
