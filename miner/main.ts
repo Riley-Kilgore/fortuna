@@ -117,6 +117,7 @@ const mine = new Command()
             )!;
 
             if (validatorState !== validatorOutRef.datum!) {
+              console.log("Someone beat us, updating state");
               validatorState = validatorOutRef.datum!;
 
               state = Data.from(validatorState) as Constr<
@@ -207,7 +208,7 @@ const mine = new Command()
           difficulty_number,
           epoch_time,
           BigInt(90000 + realTimeNow),
-          fromText("AlL HaIl tUnA"),
+          fromText("r"),
           interlink,
         ]);
 
@@ -247,7 +248,6 @@ const mine = new Command()
           console.log(`TX HASH: ${signed.toHash()}`);
           console.log("Waiting for confirmation...");
 
-          // // await lucid.awaitTx(signed.toHash());
           await delay(5000);
         } catch (e) {
           console.log(e);
