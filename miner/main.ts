@@ -44,203 +44,207 @@ const mine = new Command()
   .option("-p, --preview", "Use testnet")
   .action(async ({ preview, ogmiosUrl, kupoUrl }) => {
     while (true) {
-      const genesisFile = Deno.readTextFileSync(
-        `genesis/${preview ? "preview" : "mainnet"}.json`,
-      );
-
-      const { validatorHash, validatorAddress }: Genesis = JSON
-        .parse(
-          genesisFile,
+      try {
+        const genesisFile = Deno.readTextFileSync(
+          `genesis/${preview ? "preview" : "mainnet"}.json`,
         );
 
-      const provider = new Kupmios(kupoUrl, ogmiosUrl);
-      const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
+        const { validatorHash, validatorAddress }: Genesis = JSON
+          .parse(
+            genesisFile,
+          );
 
-      lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
+        const provider = new Kupmios(kupoUrl, ogmiosUrl);
+        const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
 
-      let validatorUTXOs = await lucid.utxosAt(validatorAddress);
+        lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
 
-      let validatorOutRef = validatorUTXOs.find(
-        (u) => u.assets[validatorHash + fromText("lord tuna")],
-      )!;
+        let validatorUTXOs = await lucid.utxosAt(validatorAddress);
 
-      let validatorState = validatorOutRef.datum!;
+        let validatorOutRef = validatorUTXOs.find(
+          (u) => u.assets[validatorHash + fromText("lord tuna")],
+        )!;
 
-      let state = Data.from(validatorState) as Constr<
-        string | bigint | string[]
-      >;
+        let validatorState = validatorOutRef.datum!;
 
-      let nonce = new Uint8Array(16);
+        let state = Data.from(validatorState) as Constr<
+          string | bigint | string[]
+        >;
 
-      crypto.getRandomValues(nonce);
+        let nonce = new Uint8Array(16);
 
-      let targetState = new Constr(0, [
-        // nonce: ByteArray
-        toHex(nonce),
-        // block_number: Int
-        state.fields[0] as bigint,
-        // current_hash: ByteArray
-        state.fields[1] as bigint,
-        // leading_zeros: Int
-        state.fields[2] as bigint,
-        // difficulty_number: Int
-        state.fields[3] as bigint,
-        //epoch_time: Int
-        state.fields[4] as bigint,
-      ]);
+        crypto.getRandomValues(nonce);
 
-      let targetHash: Uint8Array;
+        let targetState = new Constr(0, [
+          // nonce: ByteArray
+          toHex(nonce),
+          // block_number: Int
+          state.fields[0] as bigint,
+          // current_hash: ByteArray
+          state.fields[1] as bigint,
+          // leading_zeros: Int
+          state.fields[2] as bigint,
+          // difficulty_number: Int
+          state.fields[3] as bigint,
+          //epoch_time: Int
+          state.fields[4] as bigint,
+        ]);
 
-      let difficulty: {
-        leadingZeros: bigint;
-        difficulty_number: bigint;
-      };
+        let targetHash: Uint8Array;
 
-      console.log("Mining...");
-      let timer = new Date().valueOf();
-      while (true) {
-        if (new Date().valueOf() - timer > 5000) {
-          console.log("New block not found in 5 seconds, updating state");
-          timer = new Date().valueOf();
-          validatorUTXOs = await lucid.utxosAt(validatorAddress);
+        let difficulty: {
+          leadingZeros: bigint;
+          difficulty_number: bigint;
+        };
 
-          validatorOutRef = validatorUTXOs.find(
-            (u) => u.assets[validatorHash + fromText("lord tuna")],
-          )!;
+        console.log("Mining...");
+        let timer = new Date().valueOf();
+        while (true) {
+          if (new Date().valueOf() - timer > 5000) {
+            console.log("New block not found in 5 seconds, updating state");
+            timer = new Date().valueOf();
+            validatorUTXOs = await lucid.utxosAt(validatorAddress);
 
-          if (validatorState !== validatorOutRef.datum!) {
-            validatorState = validatorOutRef.datum!;
+            validatorOutRef = validatorUTXOs.find(
+              (u) => u.assets[validatorHash + fromText("lord tuna")],
+            )!;
 
-            state = Data.from(validatorState) as Constr<
-              string | bigint | string[]
-            >;
+            if (validatorState !== validatorOutRef.datum!) {
+              validatorState = validatorOutRef.datum!;
 
-            nonce = new Uint8Array(16);
+              state = Data.from(validatorState) as Constr<
+                string | bigint | string[]
+              >;
 
-            crypto.getRandomValues(nonce);
+              nonce = new Uint8Array(16);
 
-            targetState = new Constr(0, [
-              // nonce: ByteArray
-              toHex(nonce),
-              // block_number: Int
-              state.fields[0] as bigint,
-              // current_hash: ByteArray
-              state.fields[1] as bigint,
-              // leading_zeros: Int
-              state.fields[2] as bigint,
-              // difficulty_number: Int
-              state.fields[3] as bigint,
-              //epoch_time: Int
-              state.fields[4] as bigint,
-            ]);
+              crypto.getRandomValues(nonce);
+
+              targetState = new Constr(0, [
+                // nonce: ByteArray
+                toHex(nonce),
+                // block_number: Int
+                state.fields[0] as bigint,
+                // current_hash: ByteArray
+                state.fields[1] as bigint,
+                // leading_zeros: Int
+                state.fields[2] as bigint,
+                // difficulty_number: Int
+                state.fields[3] as bigint,
+                //epoch_time: Int
+                state.fields[4] as bigint,
+              ]);
+            }
           }
+
+          targetHash = sha256(sha256(fromHex(Data.to(targetState))));
+
+          difficulty = getDifficulty(targetHash);
+
+          const { leadingZeros, difficulty_number } = difficulty;
+
+          if (
+            leadingZeros > (state.fields[2] as bigint) ||
+            (leadingZeros == (state.fields[2] as bigint) &&
+              difficulty_number < (state.fields[3] as bigint))
+          ) {
+            break;
+          }
+
+          incrementU8Array(nonce);
+
+          targetState.fields[0] = toHex(nonce);
         }
 
-        targetHash = sha256(sha256(fromHex(Data.to(targetState))));
+        const realTimeNow = Number((Date.now() / 1000).toFixed(0)) * 1000 - 60000;
 
-        difficulty = getDifficulty(targetHash);
+        const interlink = calculateInterlink(toHex(targetHash), difficulty, {
+          leadingZeros: state.fields[2] as bigint,
+          difficulty_number: state.fields[3] as bigint,
+        }, state.fields[7] as string[]);
 
-        const { leadingZeros, difficulty_number } = difficulty;
+        let epoch_time = (state.fields[4] as bigint) +
+          BigInt(90000 + realTimeNow) -
+          (state.fields[5] as bigint);
+
+        let difficulty_number = state.fields[3] as bigint;
+        let leading_zeros = state.fields[2] as bigint;
 
         if (
-          leadingZeros > (state.fields[2] as bigint) ||
-          (leadingZeros == (state.fields[2] as bigint) &&
-            difficulty_number < (state.fields[3] as bigint))
+          state.fields[0] as bigint % 2016n === 0n &&
+          state.fields[0] as bigint > 0
         ) {
-          break;
+          const adjustment = getDifficultyAdjustement(epoch_time, 1_209_600_000n);
+
+          epoch_time = 0n;
+
+          const new_difficulty = calculateDifficultyNumber(
+            {
+              leadingZeros: state.fields[2] as bigint,
+              difficulty_number: state.fields[3] as bigint,
+            },
+            adjustment.numerator,
+            adjustment.denominator,
+          );
+
+          difficulty_number = new_difficulty.difficulty_number;
+          leading_zeros = new_difficulty.leadingZeros;
         }
 
-        incrementU8Array(nonce);
+        // calculateDifficultyNumber();
 
-        targetState.fields[0] = toHex(nonce);
-      }
+        const postDatum = new Constr(0, [
+          (state.fields[0] as bigint) + 1n,
+          toHex(targetHash),
+          leading_zeros,
+          difficulty_number,
+          epoch_time,
+          BigInt(90000 + realTimeNow),
+          fromText("AlL HaIl tUnA"),
+          interlink,
+        ]);
 
-      const realTimeNow = Number((Date.now() / 1000).toFixed(0)) * 1000 - 60000;
+        const outDat = Data.to(postDatum);
 
-      const interlink = calculateInterlink(toHex(targetHash), difficulty, {
-        leadingZeros: state.fields[2] as bigint,
-        difficulty_number: state.fields[3] as bigint,
-      }, state.fields[7] as string[]);
+        console.log(`Found next datum: ${outDat}`);
 
-      let epoch_time = (state.fields[4] as bigint) +
-        BigInt(90000 + realTimeNow) -
-        (state.fields[5] as bigint);
+        const mintTokens = { [validatorHash + fromText("TUNA")]: 5000000000n };
+        const masterToken = { [validatorHash + fromText("lord tuna")]: 1n };
+        try {
+          const readUtxo = await lucid.utxosByOutRef([{
+            txHash:
+              "01751095ea408a3ebe6083b4de4de8a24b635085183ab8a2ac76273ef8fff5dd",
+            outputIndex: 0,
+          }]);
+          const txMine = await lucid
+            .newTx()
+            .collectFrom(
+              [validatorOutRef],
+              Data.to(new Constr(1, [toHex(nonce)])),
+            )
+            .payToAddressWithData(
+              validatorAddress,
+              { inline: outDat },
+              masterToken,
+            )
+            .mintAssets(mintTokens, Data.to(new Constr(0, [])))
+            .readFrom(readUtxo)
+            .validTo(realTimeNow + 180000)
+            .validFrom(realTimeNow)
+            .complete();
 
-      let difficulty_number = state.fields[3] as bigint;
-      let leading_zeros = state.fields[2] as bigint;
+          const signed = await txMine.sign().complete();
 
-      if (
-        state.fields[0] as bigint % 2016n === 0n &&
-        state.fields[0] as bigint > 0
-      ) {
-        const adjustment = getDifficultyAdjustement(epoch_time, 1_209_600_000n);
+          await signed.submit();
 
-        epoch_time = 0n;
+          console.log(`TX HASH: ${signed.toHash()}`);
+          console.log("Waiting for confirmation...");
 
-        const new_difficulty = calculateDifficultyNumber(
-          {
-            leadingZeros: state.fields[2] as bigint,
-            difficulty_number: state.fields[3] as bigint,
-          },
-          adjustment.numerator,
-          adjustment.denominator,
-        );
-
-        difficulty_number = new_difficulty.difficulty_number;
-        leading_zeros = new_difficulty.leadingZeros;
-      }
-
-      // calculateDifficultyNumber();
-
-      const postDatum = new Constr(0, [
-        (state.fields[0] as bigint) + 1n,
-        toHex(targetHash),
-        leading_zeros,
-        difficulty_number,
-        epoch_time,
-        BigInt(90000 + realTimeNow),
-        fromText("AlL HaIl tUnA"),
-        interlink,
-      ]);
-
-      const outDat = Data.to(postDatum);
-
-      console.log(`Found next datum: ${outDat}`);
-
-      const mintTokens = { [validatorHash + fromText("TUNA")]: 5000000000n };
-      const masterToken = { [validatorHash + fromText("lord tuna")]: 1n };
-      try {
-        const readUtxo = await lucid.utxosByOutRef([{
-          txHash:
-            "01751095ea408a3ebe6083b4de4de8a24b635085183ab8a2ac76273ef8fff5dd",
-          outputIndex: 0,
-        }]);
-        const txMine = await lucid
-          .newTx()
-          .collectFrom(
-            [validatorOutRef],
-            Data.to(new Constr(1, [toHex(nonce)])),
-          )
-          .payToAddressWithData(
-            validatorAddress,
-            { inline: outDat },
-            masterToken,
-          )
-          .mintAssets(mintTokens, Data.to(new Constr(0, [])))
-          .readFrom(readUtxo)
-          .validTo(realTimeNow + 180000)
-          .validFrom(realTimeNow)
-          .complete();
-
-        const signed = await txMine.sign().complete();
-
-        await signed.submit();
-
-        console.log(`TX HASH: ${signed.toHash()}`);
-        console.log("Waiting for confirmation...");
-
-        // // await lucid.awaitTx(signed.toHash());
-        await delay(5000);
+          // // await lucid.awaitTx(signed.toHash());
+          await delay(5000);
+        } catch (e) {
+          console.log(e);
+        }
       } catch (e) {
         console.log(e);
       }
