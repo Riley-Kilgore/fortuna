@@ -2,6 +2,7 @@ import { loadSync } from "https://deno.land/std@0.199.0/dotenv/mod.ts";
 import { Command } from "https://deno.land/x/cliffy@v1.0.0-rc.3/command/mod.ts";
 import {
   applyParamsToScript,
+  Blockfrost,
   Constr,
   Data,
   fromHex,
@@ -41,8 +42,14 @@ const mine = new Command()
   .description("Start the miner")
   .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
   .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
+  .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
-  .action(async ({ preview, ogmiosUrl, kupoUrl }) => {
+  .option("-b, --blockfrost", "Use Blockfrost")
+  .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
+    if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
+      throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
     while (true) {
       try {
         const genesisFile = Deno.readTextFileSync(
@@ -54,7 +61,7 @@ const mine = new Command()
             genesisFile,
           );
 
-        const provider = new Kupmios(kupoUrl, ogmiosUrl);
+        const provider = blockfrost ? new blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
         const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
 
         lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
@@ -255,11 +262,17 @@ const genesis = new Command()
   .description("Create block 0")
   .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
   .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
+  .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
-  .action(async ({ preview, ogmiosUrl, kupoUrl }) => {
+  .option("-b, --blockfrost", "Use Blockfrost")
+  .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
+    if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
+      throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
     const unAppliedValidator = readValidator();
 
-    const provider = new Kupmios(kupoUrl, ogmiosUrl);
+    const provider = blockfrost ? new Blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
     const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
     lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
 
@@ -364,9 +377,15 @@ const address = new Command()
   .description("Check address balance")
   .env("KUPO_URL=<value:string>", "Kupo URL", { required: true })
   .env("OGMIOS_URL=<value:string>", "Ogmios URL", { required: true })
+  .env("BLOCKFROST_URL=<value:string>", "Blockfrost URL", { required: false })
+  .env("BLOCKFROST_API_KEY=<value:string>", "Blockfrost API Key", { required: false })
   .option("-p, --preview", "Use testnet")
-  .action(async ({ preview, ogmiosUrl, kupoUrl }) => {
-    const provider = new Kupmios(kupoUrl, ogmiosUrl);
+  .option("-b, --blockfrost", "Use Blockfrost")
+  .action(async ({ preview, ogmiosUrl, kupoUrl, blockfrost, blockfrostUrl, blockfrostApiKey }) => {
+    if (blockfrost && (!blockfrostApiKey || !blockfrostUrl)) {
+      throw new Error("Blockfrost URL and API Key are required when flag is enabled.");
+    }
+    const provider = blockfrost ? new Blockfrost(blockfrostUrl, blockfrostApiKey) : new Kupmios(kupoUrl, ogmiosUrl);
     const lucid = await Lucid.new(provider, preview ? "Preview" : "Mainnet");
 
     lucid.selectWalletFromSeed(Deno.readTextFileSync("seed.txt"));
